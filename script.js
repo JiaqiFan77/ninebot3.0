@@ -3,6 +3,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.m
 
 const canvas=document.querySelector("#webgl");
 
+
 const scene=new THREE.Scene();
 
 scene.background=
@@ -14,9 +15,10 @@ const camera=
 new THREE.PerspectiveCamera(
 45,
 innerWidth/innerHeight,
-.1,
+0.1,
 100
 );
+
 
 camera.position.z=7;
 
@@ -41,8 +43,7 @@ Math.min(devicePixelRatio,2)
 
 
 
-const group=
-new THREE.Group();
+const group=new THREE.Group();
 
 scene.add(group);
 
@@ -59,14 +60,6 @@ const files=[
 
 
 
-const loader=
-new THREE.TextureLoader();
-
-
-const cards=[];
-
-
-
 const positions=[
 
 [-1.7,.8,0],
@@ -80,23 +73,33 @@ const positions=[
 
 
 
+const loader=
+new THREE.TextureLoader();
 
-// 创建杂志
 
-files.forEach((file,i)=>{
+
+const cards=[];
+
+
+let loaded=0;
+
+
+let startAnimation=false;
+
+
+let selected=null;
+
+
+
+
+files.forEach((file,index)=>{
 
 
 loader.load(
 "images/"+file,
+
 (texture)=>{
 
-
-texture.colorSpace=
-THREE.SRGBColorSpace;
-
-
-
-// 保持真实比例
 
 const ratio=
 texture.image.width /
@@ -111,7 +114,7 @@ height*ratio;
 
 
 
-const geo=
+const geometry=
 new THREE.BoxGeometry(
 width,
 height,
@@ -120,7 +123,7 @@ height,
 
 
 
-const mat=
+const material=
 new THREE.MeshBasicMaterial({
 
 map:texture
@@ -131,46 +134,40 @@ map:texture
 
 const mesh=
 new THREE.Mesh(
-geo,
-mat
+geometry,
+material
 );
 
 
 
-// 初始动画位置
-
 mesh.position.set(
 
-positions[i][0],
+positions[index][0],
 
-positions[i][1],
+positions[index][1],
 
-positions[i][2]-2
+positions[index][2]-3
 
 );
 
 
 
 mesh.rotation.z=
-i%2?0.04:-0.04;
+index%2?0.04:-0.04;
 
 
 
 mesh.scale.set(
-0.01,
-0.01,
-0.01
+0,0,0
 );
 
 
 
 mesh.userData={
 
-issue:i+1,
+issue:index+1,
 
-index:i,
-
-show:true
+originZ:positions[index][2]
 
 };
 
@@ -183,6 +180,17 @@ cards.push(mesh);
 
 
 
+loaded++;
+
+
+
+if(loaded===files.length){
+
+startAnimation=true;
+
+}
+
+
 }
 
 );
@@ -194,10 +202,7 @@ cards.push(mesh);
 
 
 
-// ====================
-// 鼠标检测
-// ====================
-
+// 点击检测
 
 const raycaster=
 new THREE.Raycaster();
@@ -207,15 +212,13 @@ const mouse=
 new THREE.Vector2();
 
 
-let hoverCard=null;
-
-let selected=null;
+let hover=null;
 
 
 
 window.addEventListener(
 "mousemove",
-e=>{
+(e)=>{
 
 
 mouse.x=
@@ -226,7 +229,6 @@ mouse.y=
 -(e.clientY/innerHeight*2-1);
 
 
-
 raycaster.setFromCamera(
 mouse,
 camera
@@ -235,65 +237,20 @@ camera
 
 
 const hit=
-raycaster.intersectObjects(
-cards
-);
+raycaster.intersectObjects(cards);
 
 
 
-cards.forEach(card=>{
-
-
-if(card!==selected){
-
-card.scale.lerp(
-new THREE.Vector3(1,1,1),
-0.15
-);
-
-}
+hover=
+hit.length?
+hit[0].object:
+null;
 
 
 });
 
 
 
-if(hit.length){
-
-hoverCard=
-hit[0].object;
-
-
-if(hoverCard!==selected){
-
-
-hoverCard.scale.lerp(
-new THREE.Vector3(1.08,1.08,1.08),
-0.15
-);
-
-
-}
-
-
-}
-else{
-
-hoverCard=null;
-
-}
-
-
-
-});
-
-
-
-
-
-// ====================
-// 点击抽出
-// ====================
 
 
 window.addEventListener(
@@ -301,33 +258,19 @@ window.addEventListener(
 ()=>{
 
 
-if(!hoverCard)
+if(!hover)
 return;
 
 
 
-const card=
-hoverCard;
+if(selected===hover){
 
 
-
-// 已经抽出
-
-if(selected===card){
-
-
-if(card.userData.issue===6){
-
-
-setTimeout(()=>{
+if(hover.userData.issue===6){
 
 location.href=
 "issue6.html";
 
-
-},700);
-
-
 }
 
 
@@ -337,30 +280,14 @@ return;
 
 
 
-selected=card;
+selected=hover;
 
 
 
-cards.forEach(item=>{
+hover.position.z+=1.5;
 
 
-if(item!==card){
-
-item.material.opacity=.25;
-
-}
-
-
-});
-
-
-
-// 向前跳出
-
-card.position.z+=1.5;
-
-
-card.scale.set(
+hover.scale.set(
 1.18,
 1.18,
 1.18
@@ -374,9 +301,6 @@ card.scale.set(
 
 
 
-// ====================
-// 动画
-// ====================
 
 
 const clock=
@@ -398,22 +322,23 @@ clock.getElapsedTime();
 
 
 
-// 出场动画
+if(startAnimation){
+
+
 
 cards.forEach(
 (card,index)=>{
 
 
-const delay=
-index*0.18;
+const delay=index*0.18;
 
 
-const progress=
+const p=
 Math.min(
 1,
 Math.max(
 0,
-(t-delay)/1.2
+(t-delay)/1
 )
 );
 
@@ -421,13 +346,10 @@ Math.max(
 
 const ease=
 1-Math.pow(
-1-progress,
+1-p,
 3
 );
 
-
-
-if(progress>0){
 
 
 card.scale.setScalar(
@@ -435,16 +357,20 @@ ease
 );
 
 
+
 card.position.z=
-positions[index][2]
--2+
-ease*2;
+card.userData.originZ
+-
+3+
+ease*3;
 
-
-}
 
 
 });
+
+
+
+}
 
 
 
@@ -452,17 +378,11 @@ ease*2;
 // 持续漂浮
 
 group.position.y=
-Math.sin(t*0.8)
-*
-0.04;
-
+Math.sin(t*0.8)*0.05;
 
 
 group.rotation.y=
-Math.sin(t*0.2)
-*
-0.025;
-
+Math.sin(t*0.25)*0.03;
 
 
 
@@ -470,6 +390,7 @@ renderer.render(
 scene,
 camera
 );
+
 
 
 }
@@ -482,12 +403,7 @@ animate();
 
 
 
-// ====================
-// resize
-// ====================
-
-
-addEventListener(
+window.addEventListener(
 "resize",
 ()=>{
 
@@ -498,7 +414,6 @@ innerHeight;
 
 
 camera.updateProjectionMatrix();
-
 
 
 renderer.setSize(
